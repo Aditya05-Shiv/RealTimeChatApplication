@@ -80,6 +80,7 @@ const setupSocket = (io) => {
           conversation: conversation._id,
           sender: socket.user._id,
           text,
+          type: "text",
           readBy: [socket.user._id],
         });
 

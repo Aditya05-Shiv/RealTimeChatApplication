@@ -1,5 +1,6 @@
 const Conversation = require("../models/Conversation");
 const Message = require("../models/Message");
+const { uploadToCloudinary } = require("../utils/media");
 
 const populateConversation = (query) =>
   query
@@ -120,11 +121,65 @@ const sendMessage = async (req, res, next) => {
   }
 };
 
+const sendMediaMessage = async (req, res, next) => {
+  try {
+    const { text = "" } = req.body;
+
+    if (!req.file) {
+      return res.status(400).json({ message: "Choose an image or video to upload" });
+    }
+
+    const conversation = await Conversation.findById(req.params.conversationId).populate(
+      "participants",
+      "name email avatarColor bio lastSeen"
+    );
+
+    if (!conversation || !userBelongsToConversation(conversation, req.user._id)) {
+      return res.status(404).json({ message: "Conversation not found" });
+    }
+
+    const uploaded = await uploadToCloudinary(req.file);
+    const message = await Message.create({
+      conversation: conversation._id,
+      sender: req.user._id,
+      text,
+      type: uploaded.type,
+      media: {
+        url: uploaded.url,
+        publicId: uploaded.publicId,
+        originalName: uploaded.originalName,
+        mimeType: req.file.mimetype,
+        size: uploaded.bytes,
+      },
+      readBy: [req.user._id],
+    });
+
+    conversation.lastMessage = message._id;
+    await conversation.save();
+
+    const populatedMessage = await Message.findById(message._id).populate("sender", "name email avatarColor");
+    const populatedConversation = await populateConversation(Conversation.findById(conversation._id));
+    const io = req.app.get("io");
+
+    if (io) {
+      io.to(conversation._id.toString()).emit("message:new", {
+        message: populatedMessage,
+        conversation: populatedConversation,
+      });
+    }
+
+    return res.status(201).json({ message: populatedMessage, conversation: populatedConversation });
+  } catch (error) {
+    return next(error);
+  }
+};
+
 module.exports = {
   createConversation,
   getConversations,
   getMessages,
   sendMessage,
+  sendMediaMessage,
   userBelongsToConversation,
   populateConversation,
 };

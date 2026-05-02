@@ -7,6 +7,7 @@ A professional real-time chat application built with React, Tailwind CSS, Node.j
 - JWT authentication with login and registration
 - One-to-one conversations
 - Real-time messages with Socket.io
+- Image and video messages via Cloudinary
 - Online presence and typing indicators
 - MongoDB persistence for users, conversations, and messages
 - Responsive Tailwind UI for desktop and mobile
@@ -29,7 +30,9 @@ cp client/.env.example client/.env
 
 3. Start MongoDB locally or update `server/.env` with your MongoDB Atlas URI.
 
-4. Run the app in two terminals:
+4. For image/video messages, add your Cloudinary credentials to `server/.env`.
+
+5. Run the app in two terminals:
 
 ```bash
 cd server

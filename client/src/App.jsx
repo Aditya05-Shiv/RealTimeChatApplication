@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowLeft,
+  Image,
   LogOut,
   MessageCircle,
   MoreHorizontal,
@@ -196,8 +197,11 @@ function App() {
   const [typing, setTyping] = useState(null);
   const [loading, setLoading] = useState(Boolean(savedToken));
   const [sending, setSending] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState("");
   const socketRef = useRef(null);
   const bottomRef = useRef(null);
+  const fileInputRef = useRef(null);
   const typingTimer = useRef(null);
   const activeIdRef = useRef("");
 
@@ -345,6 +349,42 @@ function App() {
     });
   };
 
+  const sendMedia = async (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+
+    if (!file || !activeId || uploading) return;
+
+    const isSupported = file.type.startsWith("image/") || file.type.startsWith("video/");
+    if (!isSupported) {
+      setUploadError("Only image and video files are supported.");
+      return;
+    }
+
+    if (file.size > 25 * 1024 * 1024) {
+      setUploadError("File must be 25 MB or smaller.");
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append("media", file);
+    if (draft.trim()) formData.append("text", draft.trim());
+
+    try {
+      setUploading(true);
+      setUploadError("");
+      setDraft("");
+      socketRef.current?.emit("typing:stop", { conversationId: activeId });
+      await api.post(`/messages/${activeId}/media`, formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+    } catch (err) {
+      setUploadError(err.response?.data?.message || err.message || "Could not upload media.");
+    } finally {
+      setUploading(false);
+    }
+  };
+
   if (loading) {
     return (
       <main className="grid min-h-screen place-items-center bg-slate-100 text-slate-700">
@@ -444,7 +484,12 @@ function App() {
                         </span>
                       </div>
                       <p className={clsx("truncate text-sm", selected ? "text-blue-100" : "text-slate-500")}>
-                        {conversation.lastMessage?.text || contact?.bio || "Say hello"}
+                        {conversation.lastMessage?.text ||
+                          (conversation.lastMessage?.type === "image"
+                            ? "Photo"
+                            : conversation.lastMessage?.type === "video"
+                              ? "Video"
+                              : contact?.bio || "Say hello")}
                       </p>
                     </div>
                   </button>
@@ -504,7 +549,27 @@ function App() {
                               : "rounded-bl-sm border border-slate-200 bg-white text-slate-800",
                           )}
                         >
-                          <p className="whitespace-pre-wrap break-words leading-6">{message.text}</p>
+                          {message.type === "image" && message.media?.url && (
+                            <a href={message.media.url} target="_blank" rel="noreferrer" className="block">
+                              <img
+                                src={message.media.url}
+                                alt={message.media.originalName || "Shared image"}
+                                className="max-h-80 w-full rounded-md object-cover"
+                              />
+                            </a>
+                          )}
+                          {message.type === "video" && message.media?.url && (
+                            <video
+                              src={message.media.url}
+                              controls
+                              className="max-h-80 w-full rounded-md bg-black"
+                            />
+                          )}
+                          {message.text && (
+                            <p className={clsx("whitespace-pre-wrap break-words leading-6", message.media?.url && "mt-3")}>
+                              {message.text}
+                            </p>
+                          )}
                           <p className={clsx("mt-1 text-right text-xs", mine ? "text-blue-100" : "text-slate-400")}>
                             {formatTime(message.createdAt)}
                           </p>
@@ -523,7 +588,28 @@ function App() {
               </div>
 
               <form onSubmit={sendMessage} className="border-t border-slate-200 bg-white p-4">
+                {uploadError && (
+                  <p className="mx-auto mb-3 max-w-3xl rounded-lg bg-red-50 px-4 py-2 text-sm font-medium text-red-700">
+                    {uploadError}
+                  </p>
+                )}
                 <div className="mx-auto flex max-w-3xl items-end gap-3 rounded-lg border border-slate-200 bg-slate-50 p-2 focus-within:border-blue-400 focus-within:ring-4 focus-within:ring-blue-100">
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*,video/mp4,video/webm,video/quicktime"
+                    onChange={sendMedia}
+                    className="hidden"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={uploading || sending}
+                    title="Attach image or video"
+                    className="grid h-11 w-11 shrink-0 place-items-center rounded-lg text-slate-500 transition hover:bg-white hover:text-blue-600 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    <Image className="h-5 w-5" />
+                  </button>
                   <textarea
                     value={draft}
                     onChange={(event) => {
@@ -536,11 +622,15 @@ function App() {
                   />
                   <button
                     type="submit"
-                    disabled={!draft.trim() || sending}
+                    disabled={!draft.trim() || sending || uploading}
                     title="Send message"
                     className="grid h-11 w-11 place-items-center rounded-lg bg-blue-600 text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-300"
                   >
-                    <Send className="h-5 w-5" />
+                    {uploading ? (
+                      <span className="h-5 w-5 animate-spin rounded-full border-2 border-white/40 border-t-white" />
+                    ) : (
+                      <Send className="h-5 w-5" />
+                    )}
                   </button>
                 </div>
               </form>
