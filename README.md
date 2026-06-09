@@ -49,4 +49,11 @@ The client runs on `http://localhost:5173` and the API runs on `http://localhost
 # Live Demo 
 https://real-time-chat-application-bx81fkrv6.vercel.app
 
-#InternID: CITS3723
+#INTERNSHIP INFORMATION
+
+**InternID: CITS3723
+**Organization: Codtech IT Solutions Private Limited
+**Role: MERN Stack Web Development
+
+
+
