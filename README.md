@@ -45,3 +45,8 @@ npm run dev
 ```
 
 The client runs on `http://localhost:5173` and the API runs on `http://localhost:5001`.
+
+# Live Demo 
+https://real-time-chat-application-bx81fkrv6.vercel.app
+
+#InternID: CITS3723
